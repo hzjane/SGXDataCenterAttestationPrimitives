@@ -124,6 +124,38 @@ void readCollateralContent(sgx_ql_qve_collateral_t* sgx_collateral, const string
 
     file.close();
 }
+
+void free_collateral(sgx_ql_qve_collateral_t* collateral) {
+    if (collateral->pck_crl_issuer_chain != NULL) {
+        free(collateral->pck_crl_issuer_chain);
+        collateral->pck_crl_issuer_chain = NULL;
+    }
+    if (collateral->root_ca_crl != NULL) {
+        free(collateral->root_ca_crl);
+        collateral->root_ca_crl = NULL;
+    }
+    if (collateral->pck_crl != NULL) {
+        free(collateral->pck_crl);
+        collateral->pck_crl = NULL;
+    }
+    if (collateral->tcb_info_issuer_chain != NULL) {
+        free(collateral->tcb_info_issuer_chain);
+        collateral->tcb_info_issuer_chain = NULL;
+    }
+    if (collateral->tcb_info != NULL) {
+        free(collateral->tcb_info);
+        collateral->tcb_info = NULL;
+    }
+    if (collateral->qe_identity_issuer_chain != NULL) {
+        free(collateral->qe_identity_issuer_chain);
+        collateral->qe_identity_issuer_chain = NULL;
+    }
+    if (collateral->qe_identity != NULL) {
+        free(collateral->qe_identity);
+        collateral->qe_identity = NULL;
+    }
+}
+
 #define PATHSIZE 0x418U
 
 
@@ -549,6 +581,11 @@ int SGX_CDECL main(int argc, char *argv[])
     ecdsa_quote_verification(quote, false, p_quote_collateral);
 
     printf("\n");
+    if (p_quote_collateral != NULL) {
+        free_collateral(p_quote_collateral);
+        free(p_quote_collateral);
+    }
+    printf("%d", p_quote_collateral->version);
 
     return 0;
 }
