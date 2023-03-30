@@ -52,6 +52,7 @@ endif
 
 DCAP_Library_Name := sgx_dcap_ql
 Urts_Library_Name := sgx_urts
+DCAP_QuoteVerify_Library_Name := sgx_dcap_quoteverify
 
 App_Cpp_Files :=  App/App.cpp
 App_Include_Paths := -I$(SGX_SDK)/include -I../../QuoteGeneration/quote_wrapper/common/inc
@@ -69,7 +70,7 @@ endif
 
 
 App_Cpp_Flags := $(App_C_Flags) -std=c++11
-App_Link_Flags := $(SGX_COMMON_CFLAGS) -l$(DCAP_Library_Name) -l$(Urts_Library_Name) -ldl -lpthread
+App_Link_Flags := $(SGX_COMMON_CFLAGS) -l$(DCAP_Library_Name) -l$(Urts_Library_Name) -ldl -lpthread -l$(DCAP_QuoteVerify_Library_Name)
 
 
 App_Cpp_Objects := $(App_Cpp_Files:.cpp=.o)
