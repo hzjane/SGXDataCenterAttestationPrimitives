@@ -84,6 +84,45 @@ vector<uint8_t> readBinaryContent(const string& filePath)
     file.close();
     return retVal;
 }
+void readCollateralContent(sgx_ql_qve_collateral_t* sgx_collateral, const string& filePath) {
+    ifstream file(filePath, ios::binary);
+    if (!file.is_open()) {
+        printf("Error: Unable to open file %s\n", filePath.c_str());
+        return;
+    }
+    file.read((char*)&sgx_collateral->version, sizeof(sgx_collateral->version));
+    file.read((char*)&sgx_collateral->tee_type, sizeof(sgx_collateral->tee_type));
+
+    file.read((char*)&sgx_collateral->pck_crl_issuer_chain_size, sizeof(sgx_collateral->pck_crl_issuer_chain_size));
+    sgx_collateral->pck_crl_issuer_chain = new char[sgx_collateral->pck_crl_issuer_chain_size];
+    file.read(sgx_collateral->pck_crl_issuer_chain, sgx_collateral->pck_crl_issuer_chain_size);
+
+    file.read((char*)&sgx_collateral->root_ca_crl_size, sizeof(sgx_collateral->root_ca_crl_size));
+    sgx_collateral->root_ca_crl = new char[sgx_collateral->root_ca_crl_size];
+    file.read(sgx_collateral->root_ca_crl, sgx_collateral->root_ca_crl_size);
+
+    file.read((char*)&sgx_collateral->pck_crl_size, sizeof(sgx_collateral->pck_crl_size));
+    sgx_collateral->pck_crl = new char[sgx_collateral->pck_crl_size];
+    file.read(sgx_collateral->pck_crl, sgx_collateral->pck_crl_size);
+
+    file.read((char*)&sgx_collateral->tcb_info_issuer_chain_size, sizeof(sgx_collateral->tcb_info_issuer_chain_size));
+    sgx_collateral->tcb_info_issuer_chain = new char[sgx_collateral->tcb_info_issuer_chain_size];
+    file.read(sgx_collateral->tcb_info_issuer_chain, sgx_collateral->tcb_info_issuer_chain_size);
+
+    file.read((char*)&sgx_collateral->tcb_info_size, sizeof(sgx_collateral->tcb_info_size));
+    sgx_collateral->tcb_info = new char[sgx_collateral->tcb_info_size];
+    file.read(sgx_collateral->tcb_info, sgx_collateral->tcb_info_size);
+
+    file.read((char*)&sgx_collateral->qe_identity_issuer_chain_size, sizeof(sgx_collateral->tcb_info_size));
+    sgx_collateral->qe_identity_issuer_chain = new char[sgx_collateral->qe_identity_issuer_chain_size];
+    file.read(sgx_collateral->qe_identity_issuer_chain, sgx_collateral->qe_identity_issuer_chain_size);
+
+    file.read((char*)&sgx_collateral->qe_identity_size, sizeof(sgx_collateral->qe_identity_size));
+    sgx_collateral->qe_identity = new char[sgx_collateral->qe_identity_size];
+    file.read(sgx_collateral->qe_identity, sgx_collateral->qe_identity_size);
+
+    file.close();
+}
 #define PATHSIZE 0x418U
 
 
@@ -192,6 +231,10 @@ int ecdsa_quote_verification(vector<uint8_t> quote, bool use_qve)
         //
         current_time = time(NULL);
 
+        //get collateral
+        sgx_ql_qve_collateral_t *p_quote_collateral = NULL;
+        p_quote_collateral = (sgx_ql_qve_collateral_t *)malloc(sizeof(sgx_ql_qve_collateral_t));
+        readCollateralContent(p_quote_collateral, "collateral.dat");
 
         //call DCAP quote verify library for quote verification
         //here you can choose 'trusted' or 'untrusted' quote verification by specifying parameter '&qve_report_info'
@@ -199,7 +242,7 @@ int ecdsa_quote_verification(vector<uint8_t> quote, bool use_qve)
         //if '&qve_report_info' is NULL, this API will call 'untrusted quote verify lib' to verify quote, this mode doesn't rely on SGX capable system, but the results can not be cryptographically authenticated
         dcap_ret = tee_verify_quote(
             quote.data(), (uint32_t)quote.size(),
-            NULL,
+            (unsigned char*)p_quote_collateral,
             current_time,
             &collateral_expiration_status,
             &quote_verification_result,

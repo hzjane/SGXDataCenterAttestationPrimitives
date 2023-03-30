@@ -320,7 +320,7 @@ int main(int argc, char* argv[])
     }
 
     // Get the collateral
-    printf("\nStep5: Call tee_qv_get_collateral:");
+    printf("\nStep5: Call tee_qv_get_collateral:\n");
     qe3_ret = tee_qv_get_collateral(
             p_quote_buffer, quote_size,
             &p_quote_collateral, &p_collateral_size
