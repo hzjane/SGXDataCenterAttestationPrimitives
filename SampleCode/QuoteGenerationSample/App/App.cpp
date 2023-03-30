@@ -56,6 +56,8 @@
 #include "sgx_pce.h"
 #include "sgx_error.h"
 #include "sgx_quote_3.h"
+#include "sgx_dcap_quoteverify.h"
+#include "sgx_ql_quote.h"
 
 #include "Enclave_u.h"
 
@@ -135,7 +137,11 @@ void usage()
 
 int main(int argc, char* argv[])
 {
-
+    //collateral
+    uint8_t * p_quote_collateral = NULL;
+    uint32_t p_collateral_size = 0;
+    sgx_ql_qve_collateral_t* p_sgx_collateral = NULL;
+    FILE *fptr1 = NULL;
 
     int ret = 0;
     quote3_error_t qe3_ret = SGX_QL_SUCCESS;
@@ -274,6 +280,7 @@ int main(int argc, char* argv[])
     qe3_ret = sgx_qe_get_quote(&app_report,
         quote_size,
         p_quote_buffer);
+
     if (SGX_QL_SUCCESS != qe3_ret) {
         printf( "Error in sgx_qe_get_quote. 0x%04x\n", qe3_ret);
         ret = -1;
@@ -311,6 +318,65 @@ int main(int argc, char* argv[])
         }
         printf("succeed!\n");
     }
+
+    // Get the collateral
+    printf("\nStep5: Call tee_qv_get_collateral:");
+    qe3_ret = tee_qv_get_collateral(
+            p_quote_buffer, quote_size,
+            &p_quote_collateral, &p_collateral_size
+            );
+    if (SGX_QL_SUCCESS != qe3_ret && NULL != p_quote_collateral) {
+           printf("\tError: App: tee_qv_get_collateral failed: 0x%04x\n", qe3_ret);
+    }
+    p_sgx_collateral = (sgx_ql_qve_collateral_t*)p_quote_collateral;
+    #if _WIN32
+        fopen_s(&fptr1, "collateral.dat", "wb");
+    #else
+        fptr1 = fopen("collateral.dat","wb");
+    #endif
+
+    if (fptr1) {
+        fwrite(&p_sgx_collateral->version, sizeof(p_sgx_collateral->version), 1, fptr1);
+        fwrite(&p_sgx_collateral->tee_type, sizeof(p_sgx_collateral->tee_type), 1, fptr1);
+
+        //write size first
+        fwrite(&p_sgx_collateral->pck_crl_issuer_chain_size, sizeof(p_sgx_collateral->pck_crl_issuer_chain_size), 1, fptr1);
+        if (p_sgx_collateral->pck_crl_issuer_chain) {
+            fwrite(p_sgx_collateral->pck_crl_issuer_chain, p_sgx_collateral->pck_crl_issuer_chain_size, 1, fptr1);
+        }
+
+        fwrite(&p_sgx_collateral->root_ca_crl_size, sizeof(p_sgx_collateral->root_ca_crl_size), 1, fptr1);
+        if (p_sgx_collateral->root_ca_crl) {
+            fwrite(p_sgx_collateral->root_ca_crl, p_sgx_collateral->root_ca_crl_size, 1, fptr1);
+        }
+
+        fwrite(&p_sgx_collateral->pck_crl_size, sizeof(p_sgx_collateral->pck_crl_size), 1, fptr1);
+        if (p_sgx_collateral->pck_crl) {
+            fwrite(p_sgx_collateral->pck_crl, p_sgx_collateral->pck_crl_size, 1, fptr1);
+        }
+
+        fwrite(&p_sgx_collateral->tcb_info_issuer_chain_size, sizeof(p_sgx_collateral->tcb_info_issuer_chain_size), 1, fptr1);
+        if (p_sgx_collateral->tcb_info_issuer_chain) {
+            fwrite(p_sgx_collateral->tcb_info_issuer_chain, p_sgx_collateral->tcb_info_issuer_chain_size, 1, fptr1);
+        }
+
+        fwrite(&p_sgx_collateral->tcb_info_size, sizeof(p_sgx_collateral->tcb_info_size), 1, fptr1);
+        if (p_sgx_collateral->tcb_info) {
+            fwrite(p_sgx_collateral->tcb_info, p_sgx_collateral->tcb_info_size, 1, fptr1);
+        }
+
+        fwrite(&p_sgx_collateral->qe_identity_issuer_chain_size,sizeof(p_sgx_collateral->qe_identity_issuer_chain_size), 1, fptr1);
+        if (p_sgx_collateral->qe_identity_issuer_chain) {
+            fwrite(p_sgx_collateral->qe_identity_issuer_chain, p_sgx_collateral->qe_identity_issuer_chain_size, 1, fptr1);
+        }
+
+        fwrite(&p_sgx_collateral->qe_identity_size, sizeof(p_sgx_collateral->qe_identity_size), 1, fptr1);
+        if (p_sgx_collateral->qe_identity) {
+            fwrite(p_sgx_collateral->qe_identity, p_sgx_collateral->qe_identity_size, 1, fptr1);
+        }
+    }
+    fclose(fptr1);
+
 
 CLEANUP:
     if (NULL != p_quote_buffer) {
