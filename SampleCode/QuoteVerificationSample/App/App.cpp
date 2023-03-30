@@ -45,6 +45,7 @@
 
 #define SAMPLE_ISV_ENCLAVE  "enclave.signed.so"
 #define DEFAULT_QUOTE   "../QuoteGenerationSample/quote.dat"
+#define DEFAULT_COLLATERAL   "../QuoteGenerationSample/collateral.dat"
 
 #else
 
@@ -133,7 +134,7 @@ void readCollateralContent(sgx_ql_qve_collateral_t* sgx_collateral, const string
  *                   If false, quote verification will be performed by untrusted QVL
  */
 
-int ecdsa_quote_verification(vector<uint8_t> quote, bool use_qve)
+int ecdsa_quote_verification(vector<uint8_t> quote, bool use_qve, sgx_ql_qve_collateral_t *p_quote_collateral)
 {
 #ifndef TD_ENV
     sgx_status_t sgx_ret = SGX_SUCCESS;
@@ -230,11 +231,6 @@ int ecdsa_quote_verification(vector<uint8_t> quote, bool use_qve)
         //set current time. This is only for sample use, please use trusted time in product.
         //
         current_time = time(NULL);
-
-        //get collateral
-        sgx_ql_qve_collateral_t *p_quote_collateral = NULL;
-        p_quote_collateral = (sgx_ql_qve_collateral_t *)malloc(sizeof(sgx_ql_qve_collateral_t));
-        readCollateralContent(p_quote_collateral, "collateral.dat");
 
         //call DCAP quote verify library for quote verification
         //here you can choose 'trusted' or 'untrusted' quote verification by specifying parameter '&qve_report_info'
@@ -389,7 +385,7 @@ int ecdsa_quote_verification(vector<uint8_t> quote, bool use_qve)
         //if '&qve_report_info' is NULL, this API will call 'untrusted quote verify lib' to verify quote, this mode doesn't rely on SGX capable system, but the results can not be cryptographically authenticated
         dcap_ret = tee_verify_quote(
             quote.data(), (uint32_t)quote.size(),
-            NULL,
+            (unsigned char*)p_quote_collateral,
             current_time,
             &collateral_expiration_status,
             &quote_verification_result,
@@ -469,8 +465,10 @@ int ecdsa_quote_verification(vector<uint8_t> quote, bool use_qve)
 void usage()
 {
     printf("\nUsage:\n");
-    printf("\tPlease specify quote path, e.g. \"./app -quote <path/to/quote>\"\n");
+    printf("\tPlease specify quote path, e.g. \"./app -quote <path/to/quote> -collateral <path/to/collateral>\"\n");
     printf("\tDefault quote path is %s when no command line args\n\n", DEFAULT_QUOTE);
+    printf("\tDefault collateral path is %s when no command line args\n\n", DEFAULT_COLLATERAL);
+
 }
 
 
@@ -478,11 +476,15 @@ void usage()
 int SGX_CDECL main(int argc, char *argv[])
 {
     vector<uint8_t> quote;
+    //get collateral
+    sgx_ql_qve_collateral_t *p_quote_collateral = NULL;
+    p_quote_collateral = (sgx_ql_qve_collateral_t *)malloc(sizeof(sgx_ql_qve_collateral_t));
 
     char quote_path[PATHSIZE] = { '\0' };
+    char collateral_path[PATHSIZE] = { '\0' };
 
     //Just for sample use, better to change solid command line args solution in production env
-    if (argc != 1 && argc != 3) {
+    if (argc != 1 && argc != 3 && argc != 5) {
         usage();
         return 0;
     }
@@ -497,6 +499,16 @@ int SGX_CDECL main(int argc, char *argv[])
         strncpy(quote_path, DEFAULT_QUOTE, PATHSIZE - 1);
     }
 
+    if (argv[3] && argv[4]) {
+        if (!strcmp(argv[3], "-collateral")) {
+            strncpy(collateral_path, argv[4], PATHSIZE - 1);
+        }
+    }
+
+    if (*collateral_path == '\0') {
+        strncpy(collateral_path, DEFAULT_COLLATERAL, PATHSIZE - 1);
+    }
+
     //read quote from file
     //
     quote = readBinaryContent(quote_path);
@@ -506,6 +518,12 @@ int SGX_CDECL main(int argc, char *argv[])
     }
 
     printf("Info: ECDSA quote path: %s\n", quote_path);
+
+    //read collateral from file
+    //
+    readCollateralContent(p_quote_collateral, collateral_path);
+
+    printf("Info: ECDSA collateral path: %s\n", collateral_path);
 
 
     //We demonstrate two different types of quote verification
@@ -517,7 +535,7 @@ int SGX_CDECL main(int argc, char *argv[])
 #ifndef TD_ENV
     // Trusted quote verification, ignore error checking
     printf("\nTrusted quote verification:\n");
-    ecdsa_quote_verification(quote, true);
+    ecdsa_quote_verification(quote, true, p_quote_collateral);
 
     printf("\n===========================================\n");
     // Unrusted quote verification, ignore error checking
@@ -528,7 +546,7 @@ int SGX_CDECL main(int argc, char *argv[])
     printf("\nQuote verification inside TD, support both SGX and TDX quote:\n");
 #endif
 
-    ecdsa_quote_verification(quote, false);
+    ecdsa_quote_verification(quote, false, p_quote_collateral);
 
     printf("\n");
 
